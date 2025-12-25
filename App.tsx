@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, StopCircle, Zap, ChevronLeft, Shield, Brain, Activity, Camera } from 'lucide-react';
-import { AppView, FoodAnalysis, PetState, MealSession } from './types';
+import { Play, StopCircle, Zap, Shield, Brain, Activity, Camera, Share, Download, X } from 'lucide-react';
+import { AppView, FoodAnalysis, MealSession } from './types';
 import { analyzeFoodImage } from './services/geminiService';
 import Pacer from './components/Pacer';
 
@@ -23,12 +23,40 @@ const App: React.FC = () => {
   // UI State
   const [isLoading, setIsLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timerInterval = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // --- Effects ---
+  
+  // Check for PWA install status
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // If on mobile browser and not installed, show prompt
+    if (isMobile && !isStandalone) {
+      // Delay slightly to not annoy immediately
+      setTimeout(() => setShowInstallPrompt(true), 3000);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (view === AppView.EATING_SESSION && !isPaused) {
+      timerInterval.current = window.setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerInterval.current) clearInterval(timerInterval.current);
+    }
+    return () => {
+      if (timerInterval.current) clearInterval(timerInterval.current);
+    };
+  }, [view, isPaused]);
 
   // --- Handlers ---
 
@@ -43,14 +71,22 @@ const App: React.FC = () => {
     setView(AppView.CAMERA_ANALYSIS);
     setCameraError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      // Try environment facing first, fall back to any if failed (for desktop support)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        streamRef.current = stream;
+      } catch (e) {
+        console.warn("Environment camera not found, trying user camera", e);
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        streamRef.current = stream;
+      }
+      
+      if (videoRef.current && streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
       }
     } catch (err) {
       console.error("Camera error:", err);
-      setCameraError("无法使用相机。使用演示模式...");
+      setCameraError("无法访问相机。正在启动演示模式...");
       setTimeout(() => {
           handleAnalyzeMock(); 
       }, 1500);
@@ -115,26 +151,6 @@ const App: React.FC = () => {
     setView(AppView.SUMMARY);
   };
 
-  const handleBackToDashboard = () => {
-      stopCamera();
-      setView(AppView.DASHBOARD);
-  }
-
-  // --- Effects ---
-
-  useEffect(() => {
-    if (view === AppView.EATING_SESSION && !isPaused) {
-      timerInterval.current = window.setInterval(() => {
-        setElapsedTime(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (timerInterval.current) clearInterval(timerInterval.current);
-    }
-    return () => {
-      if (timerInterval.current) clearInterval(timerInterval.current);
-    };
-  }, [view, isPaused]);
-
   // Format MM:SS
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -145,7 +161,7 @@ const App: React.FC = () => {
   // --- Render Functions ---
 
   const renderDashboard = () => (
-    <div className="flex flex-col h-full bg-slate-50 p-6 space-y-8 max-w-md mx-auto">
+    <div className="flex flex-col h-full bg-slate-50 p-6 space-y-8 overflow-y-auto">
       <header className="pt-8">
         <div className="flex items-center gap-2 mb-1">
             <Shield className="text-blue-600 w-8 h-8" />
@@ -161,7 +177,6 @@ const App: React.FC = () => {
                 <Activity className="text-green-500 w-5 h-5" />
             </div>
             <div className="h-32 bg-slate-50 rounded-lg flex items-end justify-between p-4 px-6 gap-2">
-                {/* Mock Chart */}
                 {[40, 60, 45, 80, 70, 90, 85].map((h, i) => (
                     <div key={i} className="w-2 bg-blue-500 rounded-t-sm" style={{ height: `${h}%`, opacity: 0.5 + (i/14) }}></div>
                 ))}
@@ -183,7 +198,7 @@ const App: React.FC = () => {
 
       <button 
         onClick={handleStartCamera}
-        className="w-full bg-slate-900 text-white py-5 rounded-2xl text-lg font-bold shadow-xl shadow-slate-300 hover:bg-black transition-all flex items-center justify-center space-x-2"
+        className="w-full bg-slate-900 text-white py-5 rounded-2xl text-lg font-bold shadow-xl shadow-slate-300 hover:bg-black transition-all flex items-center justify-center space-x-2 shrink-0"
       >
         <Camera className="w-5 h-5" />
         <span>激活脂肪防御盾</span>
@@ -207,7 +222,7 @@ const App: React.FC = () => {
            </div>
        )}
        
-       <video ref={videoRef} autoPlay playsInline className="h-full object-cover w-full opacity-80" />
+       <video ref={videoRef} autoPlay playsInline muted className="h-full object-cover w-full opacity-80" />
        <canvas ref={canvasRef} className="hidden" />
        
        {/* Scanner Overlay */}
@@ -234,7 +249,7 @@ const App: React.FC = () => {
   );
 
   const renderMealPrep = () => (
-    <div className="flex flex-col h-full p-6 max-w-md mx-auto bg-slate-50">
+    <div className="flex flex-col h-full p-6 bg-slate-50 overflow-y-auto">
       <div className="mt-8 mb-6">
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Shield className="text-blue-600 fill-blue-100" /> 
@@ -275,7 +290,7 @@ const App: React.FC = () => {
           </p>
       </div>
 
-      <div className="mt-auto">
+      <div className="mt-auto pt-6">
         <button 
             onClick={startSession}
             className="w-full bg-slate-900 text-white py-5 rounded-2xl text-lg font-bold shadow-lg hover:scale-[1.02] transition-transform"
@@ -292,7 +307,7 @@ const App: React.FC = () => {
     return (
     <div className="flex flex-col h-full bg-slate-100 relative overflow-hidden">
        {/* Top Bar: Satiety Simulator */}
-       <div className="bg-white p-4 pb-6 shadow-sm z-10 border-b border-slate-200">
+       <div className="bg-white p-4 pb-6 shadow-sm z-10 border-b border-slate-200 shrink-0">
            <div className="flex justify-between items-center mb-2">
                <div className="flex items-center gap-2">
                    <Brain className="w-5 h-5 text-purple-500" />
@@ -312,7 +327,7 @@ const App: React.FC = () => {
        </div>
 
        {/* Pacer: Anti-Gulp Interceptor */}
-       <div className="flex-grow flex flex-col justify-center">
+       <div className="flex-grow flex flex-col justify-center overflow-y-auto">
            <Pacer 
              targetChews={foodAnalysis?.recommendedChews || 30} 
              isActive={!isPaused}
@@ -321,7 +336,7 @@ const App: React.FC = () => {
        </div>
 
        {/* Bottom Controls */}
-       <div className="p-6 flex justify-between items-center bg-white border-t border-slate-200">
+       <div className="p-6 flex justify-between items-center bg-white border-t border-slate-200 shrink-0">
            <div className="flex flex-col">
               <span className="text-xs font-bold text-slate-400 uppercase">当前耗时</span>
               <span className="text-2xl font-mono font-bold text-slate-800">{formatTime(elapsedTime)}</span>
@@ -347,7 +362,7 @@ const App: React.FC = () => {
   };
 
   const renderSummary = () => (
-    <div className="flex flex-col h-full p-6 max-w-md mx-auto text-center justify-center space-y-8 bg-slate-50">
+    <div className="flex flex-col h-full p-6 text-center justify-center space-y-8 bg-slate-50 overflow-y-auto">
         <div>
             <div className="inline-block p-4 bg-green-100 rounded-full mb-6">
                 <Shield className="w-16 h-16 text-green-600" />
@@ -373,21 +388,54 @@ const App: React.FC = () => {
 
         <button 
           onClick={() => setView(AppView.DASHBOARD)}
-          className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg"
+          className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg shrink-0"
         >
             返回首页
         </button>
     </div>
   );
 
-  // --- Router Switch ---
-  switch (view) {
-    case AppView.CAMERA_ANALYSIS: return renderCamera();
-    case AppView.MEAL_PREP: return renderMealPrep();
-    case AppView.EATING_SESSION: return renderEatingSession();
-    case AppView.SUMMARY: return renderSummary();
-    default: return renderDashboard();
-  }
+  const getActiveView = () => {
+    switch (view) {
+      case AppView.CAMERA_ANALYSIS: return renderCamera();
+      case AppView.MEAL_PREP: return renderMealPrep();
+      case AppView.EATING_SESSION: return renderEatingSession();
+      case AppView.SUMMARY: return renderSummary();
+      default: return renderDashboard();
+    }
+  };
+
+  // --- Main Render with Desktop Wrapper ---
+  return (
+    <div className="min-h-[100dvh] bg-slate-200 flex items-center justify-center font-sans">
+      {/* Phone Frame Container */}
+      <div className="w-full max-w-md h-[100dvh] sm:h-[90vh] sm:max-h-[900px] bg-slate-50 relative sm:rounded-[2.5rem] sm:border-[10px] sm:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+        
+        {/* Dynamic Island / Notch for Desktop aesthetics */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-36 h-7 bg-slate-800 rounded-b-xl z-50 hidden sm:block pointer-events-none"></div>
+        
+        {/* Main App Content */}
+        <div className="flex-grow h-full overflow-hidden relative">
+          {getActiveView()}
+        </div>
+
+        {/* Install Prompt Overlay (Mobile Only) */}
+        {showInstallPrompt && (
+          <div className="absolute bottom-4 left-4 right-4 bg-slate-900/95 backdrop-blur text-white p-4 rounded-2xl shadow-2xl z-50 animate-bounce">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <p className="font-bold text-sm mb-1">安装 SlimChew App</p>
+                <p className="text-xs text-slate-300">点击浏览器分享按钮 <Share className="inline w-3 h-3"/>，然后选择"添加到主屏幕" <span className="inline-block w-4 h-4 border border-slate-500 rounded text-[10px] text-center leading-3">+</span> 获得最佳全屏体验。</p>
+              </div>
+              <button onClick={() => setShowInstallPrompt(false)} className="text-slate-400 hover:text-white p-1">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default App;
