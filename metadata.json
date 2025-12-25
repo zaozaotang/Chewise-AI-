@@ -1,0 +1,7 @@
+{
+  "name": "Copy of SlimChew AI (纤体慢嚼)",
+  "description": "一款基于AI的进食行为矫正与减脂辅助工具。",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
