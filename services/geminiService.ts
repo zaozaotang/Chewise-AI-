@@ -1,12 +1,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { FoodAnalysis } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// REMOVED: Top-level initialization which causes "process is not defined" crash on app load.
+// const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeFoodImage = async (base64Image: string): Promise<FoodAnalysis> => {
   try {
+    // Initialize client lazily. 
+    // This ensures that if the API key is missing, the app loads first and only fails when action is taken.
+    // The 'define' in vite.config.ts will replace process.env.API_KEY with the actual string.
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("API Key is missing!");
+    }
+    const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+
     // UPDATED: Use 'gemini-3-flash-preview' for Multimodal Vision + JSON tasks.
-    // 'gemini-2.5-flash-image' is for image generation/editing and does not support JSON schema.
     const model = 'gemini-3-flash-preview';
     
     const prompt = `
