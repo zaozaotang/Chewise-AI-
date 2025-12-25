@@ -1,9 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>SlowBite 慢食记</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>SlimChew AI 纤体慢嚼</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#F8FAFC" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- iOS Specific PWA Settings -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SlimChew" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3076/3076134.png" />
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -16,7 +28,7 @@
                 200: '#C9D6C9',
                 300: '#A3BFA3',
                 400: '#7F9F7F',
-                500: '#608060', // Primary Brand Color
+                500: '#608060', 
                 600: '#4A5D4F',
                 700: '#354238',
                 800: '#262F28',
@@ -44,7 +56,7 @@
               },
               chew: {
                 '0%, 100%': { transform: 'scaleY(1) scaleX(1)' },
-                '50%': { transform: 'scaleY(0.85) scaleX(1.05)' }, // Squish effect
+                '50%': { transform: 'scaleY(0.85) scaleX(1.05)' }, 
               }
             }
           },
@@ -53,9 +65,11 @@
     </script>
     <style>
       body {
-        background-color: #F7F3E8; /* sand-100 */
-        color: #354238; /* sage-700 */
+        background-color: #F8FAFC; 
+        color: #354238; 
         -webkit-font-smoothing: antialiased;
+        /* Prevent elastic scrolling on iOS */
+        overscroll-behavior-y: none;
       }
       /* Hide scrollbar for clean mobile look */
       ::-webkit-scrollbar {
